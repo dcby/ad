@@ -1,5 +1,4 @@
-import { getAds } from "./providers/baraholka.ts";
+import "https://deno.land/std@0.143.0/dotenv/load.ts";
+import task from "./task.ts";
 
-const items = await getAds();
-
-console.log(items);
+task();

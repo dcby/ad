@@ -1,13 +1,13 @@
 import { cheerio as $, TagElement, TextElement } from "https://deno.land/x/cheerio@1.0.4/mod.ts";
 import { AdItem } from "../types.ts";
 
-export async function getAds(): Promise<AdItem[]> {
-    // const res = await fetch("https://baraholka.onliner.by/search.php?q=marantz&f=45&topicTitle=1&cat=1");
-    // const text = await res.text();
+export default async function getAds(): Promise<AdItem[]> {
+    const res = await fetch("https://baraholka.onliner.by/search.php?q=marantz&f=45&topicTitle=1&cat=1&by=created");
+    const text = await res.text();
 
-    // await Deno.writeTextFile(".data/baraholka.html", text);
+    // await Deno.writeTextFile(".data/baraholka.html", text0);
 
-    const text = await Deno.readTextFile(".data/baraholka.html");
+    // const text = await Deno.readTextFile(".data/baraholka.html");
     
     const $root = $.load(text);
 
@@ -27,8 +27,8 @@ function parseItem(el: TagElement | TextElement): AdItem | undefined {
         return;
     }
     
-    const $div = $("> td.frst.ph.colspan > table > tbody > tr > td.txt > div.txt-i", el);
-    let $e = $("> table > tbody > tr > td > h2 > a", $div);
+    let $e = $("> td.frst.ph.colspan > table > tbody > tr > td.txt > div.txt-i", el);
+    $e = $("> table > tbody > tr > td > h2 > a", $e);
 
     const title = $e.text();
     const url = new URL($e.attr("href") ?? "", "https://baraholka.onliner.by/");
