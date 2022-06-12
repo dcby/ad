@@ -1,47 +1,67 @@
-import { cheerio as $, TagElement, TextElement } from "https://deno.land/x/cheerio@1.0.4/mod.ts";
+import {
+  DOMParser,
+  Element,
+} from "https://deno.land/x/deno_dom@v0.1.30-alpha/deno-dom-wasm.ts";
 import { AdItem } from "../types.ts";
 
-export default async function getAds(): Promise<AdItem[]> {
-    const res = await fetch("https://baraholka.onliner.by/search.php?q=marantz&f=45&topicTitle=1&cat=1&by=created");
-    const text = await res.text();
+export async function download() {
+  const res = await fetch(
+    "https://baraholka.onliner.by/search.php?q=marantz&f=45&topicTitle=1&cat=1&by=created",
+  );
+  const text = await res.text();
 
-    // await Deno.writeTextFile(".data/baraholka.html", text0);
-
-    // const text = await Deno.readTextFile(".data/baraholka.html");
-    
-    const $root = $.load(text);
-
-    let $e = $root("table.ba-tbl-list__table");
-    $e = $("> tbody > tr:not(.sorting__1)", $e);
-
-    const items = $e
-        .map((_, e) => parseItem(e))
-        .get<AdItem | undefined>()
-        .filter(e => e !== undefined) as AdItem[];
-    
-    return items;
+  return text;
 }
 
-function parseItem(el: TagElement | TextElement): AdItem | undefined {
-    if (!isTag(el)) {
-        return;
+export function* parse(html: string): Iterable<AdItem> {
+  const document = new DOMParser().parseFromString(html, "text/html");
+
+  if (document === null) {
+    throw new Error("Input data is not HTML.");
+  }
+
+  const e = document.querySelector("table.ba-tbl-list__table");
+  if (e === null) {
+    throw new Error("Unexpected data.");
+  }
+
+  const ee = e.querySelectorAll(":scope > tbody > tr:not(.sorting__1)");
+  for (const e of ee) {
+    if (e instanceof Element) {
+      const item = parseItem(e as Element);
+      yield item;
+    } else {
+      throw new Error("Unexpected data.");
     }
-    
-    let $e = $("> td.frst.ph.colspan > table > tbody > tr > td.txt > div.txt-i", el);
-    $e = $("> table > tbody > tr > td > h2 > a", $e);
-
-    const title = $e.text();
-    const url = new URL($e.attr("href") ?? "", "https://baraholka.onliner.by/");
-    const id = url.searchParams.get("t") ?? "";
-
-    return {
-        id,
-        provider: "baraholka.onliner.by",
-        title,
-        url: url.toString(),
-    };
+  }
 }
 
-function isTag(value: TagElement | TextElement): value is TagElement {
-    return value.type === "tag";
+function parseItem(el: Element): AdItem {
+  let e = el.querySelector(
+    ":scope > td.frst.ph.colspan > table > tbody > tr > td.txt > div.txt-i",
+  );
+  if (e === null) {
+    throw new Error("Unexpected data.");
+  }
+
+  e = e.querySelector(":scope > table > tbody > tr > td > h2 > a");
+  if (e === null) {
+    throw new Error("Unexpected data.");
+  }
+
+  const title = e.textContent;
+  const url = new URL(
+    e.getAttribute("href") ?? "",
+    "https://baraholka.onliner.by/",
+  );
+  const id = url.searchParams.get("t") ?? "";
+
+  const result = {
+    id,
+    provider: "baraholka.onliner.by",
+    title,
+    url: url.toString(),
+  };
+
+  return result;
 }

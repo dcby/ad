@@ -1,54 +1,60 @@
-import { cheerio as $, TagElement } from "https://deno.land/x/cheerio@1.0.4/mod.ts";
+import {
+  DOMParser,
+  Element,
+} from "https://deno.land/x/deno_dom@v0.1.30-alpha/deno-dom-wasm.ts";
 import { AdItem } from "../types.ts";
 
-export default async function getAds(): Promise<AdItem[]> {
-    const res = await fetch("https://www.kufar.by/l?ot=1&query=marantz", {
-        headers: {
-            "Cookie": "kuf_agr={%22advertisements%22:true%2C%22statistic%22:true%2C%22mindbox%22:true}"
-        }
-    });
-    const text = await res.text();
+export async function download() {
+  const res = await fetch("https://www.kufar.by/l?ot=1&query=marantz", {
+    headers: {
+      "Cookie":
+        "kuf_agr={%22advertisements%22:true%2C%22statistic%22:true%2C%22mindbox%22:true}",
+    },
+  });
+  const text = await res.text();
 
-    // await Deno.writeTextFile(".data/kufar.html", text);
-
-    // const text = await Deno.readTextFile(".data/kufar.html");
-    
-    const $root = $.load(text);
-
-    let $e = $root("div[data-name='listings']");
-    if ($e.length !== 1) {
-        return [];
-    }
-
-    $e = $("section", $e);
-    if ($e.length === 0) {
-        return [];
-    }
-
-    const ret: AdItem[] = [];
-    $e.each((_, e) => {
-        if (e.type === "tag") {
-            const item = parseItem(e);
-            if (item) {
-                ret.push(item);
-            }
-        }
-    });
-    
-    return ret;
+  return text;
 }
 
-function parseItem(el: TagElement): AdItem | undefined {
-    let $e = $("> a", el);
-    const url = new URL($e.attr("href") ?? "");
+export function* parse(html: string): Iterable<AdItem> {
+  const document = new DOMParser().parseFromString(html, "text/html");
+  if (document === null) {
+    throw new Error("Input data is not HTML.");
+  }
 
-    $e = $("> div > div > div > h3", $e);
-    const title = $e.text();
+  const e = document.querySelector("div[data-name='listings']");
+  if (e === null) {
+    throw new Error("Input data is not HTML.");
+  }
 
-    return {
-        id: url.pathname.split("/").at(-1) ?? "",
-        provider: "kufar.by",
-        title,
-        url: url.toString(),
-    };
+  const ee = e.querySelectorAll("section");
+  for (const e of ee) {
+    if (e instanceof Element) {
+      const item = parseItem(e as Element);
+      yield item;
+    } else {
+      throw new Error("Unexpected data.");
+    }
+  }
+}
+
+function parseItem(el: Element): AdItem {
+  let e = el.querySelector(":scope > a");
+  if (e === null) {
+    throw new Error("Unexpected data.");
+  }
+  const url = new URL(e.getAttribute("href") ?? "");
+
+  e = e.querySelector(":scope > div > div > div > h3");
+  if (e === null) {
+    throw new Error("Unexpected data.");
+  }
+  const title = e.textContent;
+
+  return {
+    id: url.pathname.split("/").at(-1) ?? "",
+    provider: "kufar.by",
+    title,
+    url: url.toString(),
+  };
 }
